@@ -2,12 +2,21 @@
   "name": "@aqaranewbiz/mysql-aqaranewbiz",
   "version": "1.0.0",
   "description": "MCP server for MySQL database operations",
-  "main": "mcp_server.js",
+  "main": "mcp_server.py",
   "type": "module",
+  "bin": {
+    "mcp-mysql-server": "./run.js"
+  },
   "scripts": {
-    "start": "node mcp_server.js"
+    "start": "python mcp_server.py"
   },
   "mcp": {
+    "type": "server",
+    "language": "python",
+    "local": {
+      "command": "python",
+      "args": ["mcp_server.py"]
+    },
     "tools": {
       "connect_db": {
         "description": "Establish connection to MySQL database using provided credentials",
@@ -93,9 +102,7 @@
       }
     }
   },
-  "dependencies": {
-    "mysql2": "^3.6.0"
-  },
+  "dependencies": {},
   "keywords": [
     "mcp",
     "mysql",
