@@ -8,12 +8,12 @@
 To install MySQL Server for Claude Desktop automatically via Smithery:
 
 ```bash
-npx -y @smithery/cli install @f4ww4z/mcp-mysql-server --client claude
+npx -y @smithery/cli install @aqaranewbiz/mysql-aqaranewbiz --client claude
 ```
 
 ### Manual Installation
 ```bash
-npx @f4ww4z/mcp-mysql-server
+npx @aqaranewbiz/mysql-aqaranewbiz
 ```
 
 ## Configuration
@@ -25,7 +25,7 @@ The server requires the following environment variables to be set in your MCP se
   "mcpServers": {
     "mysql": {
       "command": "npx",
-      "args": ["-y", "@f4ww4z/mcp-mysql-server"],
+      "args": ["-y", "@aqaranewbiz/mysql-aqaranewbiz"],
       "env": {
         "MYSQL_HOST": "your_host",
         "MYSQL_USER": "your_user",
