@@ -1,16 +1,13 @@
+import json
+import sys
 import os
-from typing import Dict, List, Any, Optional
+from typing import Dict, Any, Optional
 import mysql.connector
 from mysql.connector import Error
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-import uvicorn
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
-
-app = FastAPI()
 
 # Database configuration
 db_config = {
@@ -20,28 +17,14 @@ db_config = {
     'database': os.getenv('MYSQL_DATABASE')
 }
 
-# Model definitions
-class ConnectDBParams(BaseModel):
-    host: str
-    user: str
-    password: str
-    database: str
-
-class QueryParams(BaseModel):
-    sql: str
-    params: Optional[List[Any]] = None
-
-class TableParams(BaseModel):
-    table: str
-
-# MCP Tool implementations
 def connect_db(params: Dict[str, Any]) -> Dict[str, Any]:
     """Establish database connection"""
     try:
         conn = mysql.connector.connect(**params)
+        conn.close()
         return {"status": "success", "message": "Database connection established"}
     except Error as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"status": "error", "message": str(e)}
 
 def execute_query(params: Dict[str, Any]) -> Dict[str, Any]:
     """Execute SELECT query"""
@@ -60,7 +43,7 @@ def execute_query(params: Dict[str, Any]) -> Dict[str, Any]:
         
         return {"status": "success", "results": results}
     except Error as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"status": "error", "message": str(e)}
 
 def execute_command(params: Dict[str, Any]) -> Dict[str, Any]:
     """Execute INSERT, UPDATE, or DELETE query"""
@@ -83,7 +66,7 @@ def execute_command(params: Dict[str, Any]) -> Dict[str, Any]:
             "affected_rows": affected_rows
         }
     except Error as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"status": "error", "message": str(e)}
 
 def list_tables() -> Dict[str, Any]:
     """List all tables in database"""
@@ -97,7 +80,7 @@ def list_tables() -> Dict[str, Any]:
         
         return {"status": "success", "tables": tables}
     except Error as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"status": "error", "message": str(e)}
 
 def describe_table(params: Dict[str, Any]) -> Dict[str, Any]:
     """Get table structure"""
@@ -111,42 +94,106 @@ def describe_table(params: Dict[str, Any]) -> Dict[str, Any]:
         
         return {"status": "success", "structure": structure}
     except Error as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"status": "error", "message": str(e)}
 
-# MCP API endpoints
-@app.post("/mcp/connect_db")
-async def mcp_connect_db(params: ConnectDBParams):
-    return connect_db(params.dict())
+def handle_request(request: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle MCP requests"""
+    try:
+        request_type = request.get("type")
+        request_id = request.get("id")
 
-@app.post("/mcp/query")
-async def mcp_query(params: QueryParams):
-    return execute_query(params.dict())
-
-@app.post("/mcp/execute")
-async def mcp_execute(params: QueryParams):
-    return execute_command(params.dict())
-
-@app.get("/mcp/list_tables")
-async def mcp_list_tables():
-    return list_tables()
-
-@app.post("/mcp/describe_table")
-async def mcp_describe_table(params: TableParams):
-    return describe_table(params.dict())
-
-@app.get("/status")
-async def get_status():
-    """Get server status and available tools"""
-    return {
-        "status": "running",
-        "tools": {
-            "connect_db": "Establish database connection",
-            "query": "Execute SELECT queries",
-            "execute": "Execute INSERT, UPDATE, or DELETE queries",
-            "list_tables": "List all tables",
-            "describe_table": "Get table structure"
+        if request_type == "getServerInfo":
+            return {
+                "type": "response",
+                "id": request_id,
+                "result": {
+                    "name": "@aqaranewbiz/mysql-aqaranewbiz",
+                    "version": "1.0.0",
+                    "tools": {
+                        "connect_db": {
+                            "description": "Establish connection to MySQL database using provided credentials"
+                        },
+                        "query": {
+                            "description": "Execute SELECT queries with optional prepared statement parameters"
+                        },
+                        "execute": {
+                            "description": "Execute INSERT, UPDATE, or DELETE queries with optional prepared statement parameters"
+                        },
+                        "list_tables": {
+                            "description": "List all tables in the connected database"
+                        },
+                        "describe_table": {
+                            "description": "Get table structure"
+                        }
+                    }
+                }
+            }
+        elif request_type == "executeTool":
+            tool_name = request.get("tool")
+            params = request.get("params", {})
+            
+            if tool_name == "connect_db":
+                result = connect_db(params)
+            elif tool_name == "query":
+                result = execute_query(params)
+            elif tool_name == "execute":
+                result = execute_command(params)
+            elif tool_name == "list_tables":
+                result = list_tables()
+            elif tool_name == "describe_table":
+                result = describe_table(params)
+            else:
+                return {
+                    "type": "error",
+                    "id": request_id,
+                    "error": f"Unknown tool: {tool_name}"
+                }
+            
+            if result.get("status") == "error":
+                return {
+                    "type": "error",
+                    "id": request_id,
+                    "error": result["message"]
+                }
+            
+            return {
+                "type": "response",
+                "id": request_id,
+                "result": result
+            }
+        else:
+            return {
+                "type": "error",
+                "id": request_id,
+                "error": f"Unknown request type: {request_type}"
+            }
+    except Exception as e:
+        return {
+            "type": "error",
+            "id": request.get("id"),
+            "error": str(e)
         }
-    }
+
+def main():
+    """Main function to handle stdin/stdout communication"""
+    while True:
+        try:
+            line = sys.stdin.readline()
+            if not line:
+                break
+                
+            request = json.loads(line)
+            response = handle_request(request)
+            
+            sys.stdout.write(json.dumps(response) + "\n")
+            sys.stdout.flush()
+            
+        except json.JSONDecodeError as e:
+            sys.stderr.write(f"Invalid JSON input: {str(e)}\n")
+            sys.stderr.flush()
+        except Exception as e:
+            sys.stderr.write(f"Error: {str(e)}\n")
+            sys.stderr.flush()
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000) 
+    main() 
