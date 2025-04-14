@@ -1,7 +1,7 @@
 import json
 import sys
 import os
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import mysql.connector
 from mysql.connector import Error
 from dotenv import load_dotenv
@@ -14,15 +14,50 @@ db_config = {
     'host': os.getenv('MYSQL_HOST'),
     'user': os.getenv('MYSQL_USER'),
     'password': os.getenv('MYSQL_PASSWORD'),
-    'database': os.getenv('MYSQL_DATABASE')
+    'database': os.getenv('MYSQL_DATABASE'),
+    'charset': 'utf8mb4',
+    'collation': 'utf8mb4_general_ci'
 }
 
-def connect_db(params: Dict[str, Any]) -> Dict[str, Any]:
-    """Establish database connection"""
+def create_or_modify_table(params: Dict[str, Any]) -> Dict[str, Any]:
+    """Create or modify a table"""
     try:
-        conn = mysql.connector.connect(**params)
+        conn = mysql.connector.connect(**db_config)
+        cursor = conn.cursor()
+        
+        table_name = params['table_name']
+        columns = params['columns']
+        unique_keys = params.get('unique_keys', [])
+        
+        # Drop existing table
+        cursor.execute(f"DROP TABLE IF EXISTS {table_name}")
+        
+        # Create new table
+        column_defs = []
+        for col in columns:
+            col_def = f"{col['name']} {col['type']}"
+            if col.get('not_null'):
+                col_def += " NOT NULL"
+            if col.get('default'):
+                col_def += f" DEFAULT {col['default']}"
+            if col.get('auto_increment'):
+                col_def += " AUTO_INCREMENT"
+            if col.get('primary_key'):
+                col_def += " PRIMARY KEY"
+            column_defs.append(col_def)
+        
+        # Add unique keys
+        for key in unique_keys:
+            column_defs.append(f"UNIQUE KEY {key['name']} ({key['columns']})")
+        
+        create_table_sql = f"CREATE TABLE {table_name} ({', '.join(column_defs)})"
+        cursor.execute(create_table_sql)
+        
+        conn.commit()
+        cursor.close()
         conn.close()
-        return {"status": "success", "message": "Database connection established"}
+        
+        return {"status": "success", "message": f"Table {table_name} created successfully"}
     except Error as e:
         return {"status": "error", "message": str(e)}
 
@@ -110,20 +145,60 @@ def handle_request(request: Dict[str, Any]) -> Dict[str, Any]:
                     "name": "@aqaranewbiz/mysql-aqaranewbiz",
                     "version": "1.0.0",
                     "tools": {
-                        "connect_db": {
-                            "description": "Establish connection to MySQL database using provided credentials"
+                        "create_table": {
+                            "description": "Create or modify a table",
+                            "parameters": {
+                                "table_name": {"type": "string"},
+                                "columns": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "name": {"type": "string"},
+                                            "type": {"type": "string"},
+                                            "not_null": {"type": "boolean", "optional": true},
+                                            "default": {"type": "string", "optional": true},
+                                            "auto_increment": {"type": "boolean", "optional": true},
+                                            "primary_key": {"type": "boolean", "optional": true}
+                                        }
+                                    }
+                                },
+                                "unique_keys": {
+                                    "type": "array",
+                                    "optional": true,
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "name": {"type": "string"},
+                                            "columns": {"type": "string"}
+                                        }
+                                    }
+                                }
+                            }
                         },
                         "query": {
-                            "description": "Execute SELECT queries with optional prepared statement parameters"
+                            "description": "Execute SELECT queries",
+                            "parameters": {
+                                "sql": {"type": "string"},
+                                "params": {"type": "array", "optional": true}
+                            }
                         },
                         "execute": {
-                            "description": "Execute INSERT, UPDATE, or DELETE queries with optional prepared statement parameters"
+                            "description": "Execute INSERT, UPDATE, or DELETE queries",
+                            "parameters": {
+                                "sql": {"type": "string"},
+                                "params": {"type": "array", "optional": true}
+                            }
                         },
                         "list_tables": {
-                            "description": "List all tables in the connected database"
+                            "description": "List all tables in database",
+                            "parameters": {}
                         },
                         "describe_table": {
-                            "description": "Get table structure"
+                            "description": "Get table structure",
+                            "parameters": {
+                                "table": {"type": "string"}
+                            }
                         }
                     }
                 }
@@ -132,8 +207,8 @@ def handle_request(request: Dict[str, Any]) -> Dict[str, Any]:
             tool_name = request.get("tool")
             params = request.get("params", {})
             
-            if tool_name == "connect_db":
-                result = connect_db(params)
+            if tool_name == "create_table":
+                result = create_or_modify_table(params)
             elif tool_name == "query":
                 result = execute_query(params)
             elif tool_name == "execute":

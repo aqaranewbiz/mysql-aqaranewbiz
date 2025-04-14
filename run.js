@@ -3,24 +3,20 @@
 const { spawn } = require('child_process');
 const path = require('path');
 
-// Get the directory where the script is located
+// Get the directory of this script
 const scriptDir = __dirname;
 
 // Path to the Python script
 const pythonScript = path.join(scriptDir, 'mcp_server.py');
 
-// Spawn Python process
+// Spawn the Python process
 const pythonProcess = spawn('python', [pythonScript], {
   stdio: ['pipe', 'pipe', 'pipe']
 });
 
-// Forward stdin to Python process
+// Handle stdin/stdout communication
 process.stdin.pipe(pythonProcess.stdin);
-
-// Forward Python stdout to process stdout
 pythonProcess.stdout.pipe(process.stdout);
-
-// Forward Python stderr to process stderr
 pythonProcess.stderr.pipe(process.stderr);
 
 // Handle process termination
