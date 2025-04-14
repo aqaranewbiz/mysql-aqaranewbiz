@@ -1,87 +1,152 @@
-import json
-import sys
 import os
-from typing import Dict, Any
+from typing import Dict, List, Any, Optional
+import mysql.connector
+from mysql.connector import Error
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+import uvicorn
+from dotenv import load_dotenv
 
-def handle_request(request: Dict[str, Any]) -> Dict[str, Any]:
-    """Handle MCP requests"""
+# Load environment variables
+load_dotenv()
+
+app = FastAPI()
+
+# Database configuration
+db_config = {
+    'host': os.getenv('MYSQL_HOST'),
+    'user': os.getenv('MYSQL_USER'),
+    'password': os.getenv('MYSQL_PASSWORD'),
+    'database': os.getenv('MYSQL_DATABASE')
+}
+
+# Model definitions
+class ConnectDBParams(BaseModel):
+    host: str
+    user: str
+    password: str
+    database: str
+
+class QueryParams(BaseModel):
+    sql: str
+    params: Optional[List[Any]] = None
+
+class TableParams(BaseModel):
+    table: str
+
+# MCP Tool implementations
+def connect_db(params: Dict[str, Any]) -> Dict[str, Any]:
+    """Establish database connection"""
     try:
-        if request["type"] == "getServerInfo":
-            return {
-                "type": "response",
-                "id": request["id"],
-                "result": {
-                    "name": "Smithery MCP Server",
-                    "version": "1.0.0",
-                    "capabilities": ["mysql_query", "search"],
-                    "mcp_server_type": "mysql" if os.getenv("MCP_SERVER_TYPE") == "mysql" else "perplexity"
-                }
-            }
-        elif request["type"] == "executeTool":
-            tool_name = request["tool"]
-            params = request["params"]
-            
-            if tool_name == "mysql_query":
-                # MySQL 쿼리 실행 로직
-                return {
-                    "type": "response",
-                    "id": request["id"],
-                    "result": {
-                        "success": True,
-                        "data": "MySQL query result"
-                    }
-                }
-            elif tool_name == "search":
-                # Perplexity 검색 로직
-                return {
-                    "type": "response",
-                    "id": request["id"],
-                    "result": {
-                        "success": True,
-                        "data": "Search result"
-                    }
-                }
-            else:
-                return {
-                    "type": "error",
-                    "id": request["id"],
-                    "error": f"Unknown tool: {tool_name}"
-                }
-        else:
-            return {
-                "type": "error",
-                "id": request["id"],
-                "error": f"Unknown request type: {request['type']}"
-            }
-    except Exception as e:
-        return {
-            "type": "error",
-            "id": request.get("id", "unknown"),
-            "error": str(e)
-        }
+        conn = mysql.connector.connect(**params)
+        return {"status": "success", "message": "Database connection established"}
+    except Error as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-def main():
-    """Main function to handle stdio communication"""
-    while True:
-        try:
-            # Read request from stdin
-            line = sys.stdin.readline()
-            if not line:
-                break
-                
-            request = json.loads(line)
-            response = handle_request(request)
+def execute_query(params: Dict[str, Any]) -> Dict[str, Any]:
+    """Execute SELECT query"""
+    try:
+        conn = mysql.connector.connect(**db_config)
+        cursor = conn.cursor(dictionary=True)
+        
+        if params.get('params'):
+            cursor.execute(params['sql'], params['params'])
+        else:
+            cursor.execute(params['sql'])
             
-            # Write response to stdout
-            sys.stdout.write(json.dumps(response) + "\n")
-            sys.stdout.flush()
+        results = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        return {"status": "success", "results": results}
+    except Error as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+def execute_command(params: Dict[str, Any]) -> Dict[str, Any]:
+    """Execute INSERT, UPDATE, or DELETE query"""
+    try:
+        conn = mysql.connector.connect(**db_config)
+        cursor = conn.cursor()
+        
+        if params.get('params'):
+            cursor.execute(params['sql'], params['params'])
+        else:
+            cursor.execute(params['sql'])
             
-        except json.JSONDecodeError:
-            sys.stderr.write("Invalid JSON input\n")
-            sys.stderr.flush()
-        except Exception as e:
-            sys.stderr.write(f"Error: {str(e)}\n")
-            sys.stderr.flush()
+        conn.commit()
+        affected_rows = cursor.rowcount
+        cursor.close()
+        conn.close()
+        
+        return {
+            "status": "success",
+            "affected_rows": affected_rows
+        }
+    except Error as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+def list_tables() -> Dict[str, Any]:
+    """List all tables in database"""
+    try:
+        conn = mysql.connector.connect(**db_config)
+        cursor = conn.cursor()
+        cursor.execute("SHOW TABLES")
+        tables = [table[0] for table in cursor.fetchall()]
+        cursor.close()
+        conn.close()
+        
+        return {"status": "success", "tables": tables}
+    except Error as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+def describe_table(params: Dict[str, Any]) -> Dict[str, Any]:
+    """Get table structure"""
+    try:
+        conn = mysql.connector.connect(**db_config)
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(f"DESCRIBE {params['table']}")
+        structure = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        return {"status": "success", "structure": structure}
+    except Error as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# MCP API endpoints
+@app.post("/mcp/connect_db")
+async def mcp_connect_db(params: ConnectDBParams):
+    return connect_db(params.dict())
+
+@app.post("/mcp/query")
+async def mcp_query(params: QueryParams):
+    return execute_query(params.dict())
+
+@app.post("/mcp/execute")
+async def mcp_execute(params: QueryParams):
+    return execute_command(params.dict())
+
+@app.get("/mcp/list_tables")
+async def mcp_list_tables():
+    return list_tables()
+
+@app.post("/mcp/describe_table")
+async def mcp_describe_table(params: TableParams):
+    return describe_table(params.dict())
+
+@app.get("/status")
+async def get_status():
+    """Get server status and available tools"""
+    return {
+        "status": "running",
+        "tools": {
+            "connect_db": "Establish database connection",
+            "query": "Execute SELECT queries",
+            "execute": "Execute INSERT, UPDATE, or DELETE queries",
+            "list_tables": "List all tables",
+            "describe_table": "Get table structure"
+        }
+    }
 
 if __name__ == "__main__":
-    main() 
+    uvicorn.run(app, host="0.0.0.0", port=8000) 
