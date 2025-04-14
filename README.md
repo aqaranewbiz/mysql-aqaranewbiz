@@ -2,6 +2,41 @@
 [![smithery badge](https://smithery.ai/badge/@aqaranewbiz/mysql-aqaranewbiz)](https://smithery.ai/server/@aqaranewbiz/mysql-aqaranewbiz)
 이 프로젝트는 Smithery의 Model Context Protocol (MCP)을 사용하여 MySQL 데이터베이스와 상호작용하는 서버입니다.
 
+## Installation
+
+### Installing via Smithery
+To install MySQL Server for Claude Desktop automatically via Smithery:
+
+```bash
+npx -y @smithery/cli install @f4ww4z/mcp-mysql-server --client claude
+```
+
+### Manual Installation
+```bash
+npx @f4ww4z/mcp-mysql-server
+```
+
+## Configuration
+
+The server requires the following environment variables to be set in your MCP settings configuration file:
+
+```json
+{
+  "mcpServers": {
+    "mysql": {
+      "command": "npx",
+      "args": ["-y", "@f4ww4z/mcp-mysql-server"],
+      "env": {
+        "MYSQL_HOST": "your_host",
+        "MYSQL_USER": "your_user",
+        "MYSQL_PASSWORD": "your_password",
+        "MYSQL_DATABASE": "your_database"
+      }
+    }
+  }
+}
+```
+
 ## 주요 기능
 
 - MySQL 데이터베이스 연결 및 쿼리 실행
