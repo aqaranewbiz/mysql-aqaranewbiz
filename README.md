@@ -37,6 +37,76 @@ The server requires the following environment variables to be set in your MCP se
 }
 ```
 
+## Available Tools
+
+### 1. connect_db
+Establish connection to MySQL database using provided credentials.
+
+```javascript
+use_mcp_tool({
+  server_name: "mysql",
+  tool_name: "connect_db",
+  arguments: {
+    host: "localhost",
+    user: "your_user",
+    password: "your_password",
+    database: "your_database"
+  }
+});
+```
+
+### 2. query
+Execute SELECT queries with optional prepared statement parameters.
+
+```javascript
+use_mcp_tool({
+  server_name: "mysql",
+  tool_name: "query",
+  arguments: {
+    sql: "SELECT * FROM users WHERE id = ?",
+    params: [1]
+  }
+});
+```
+
+### 3. execute
+Execute INSERT, UPDATE, or DELETE queries with optional prepared statement parameters.
+
+```javascript
+use_mcp_tool({
+  server_name: "mysql",
+  tool_name: "execute",
+  arguments: {
+    sql: "INSERT INTO users (name, email) VALUES (?, ?)",
+    params: ["John Doe", "john@example.com"]
+  }
+});
+```
+
+### 4. list_tables
+List all tables in the connected database.
+
+```javascript
+use_mcp_tool({
+  server_name: "mysql",
+  tool_name: "list_tables",
+  arguments: {}
+});
+```
+
+### 5. describe_table
+Get the structure of a specific table.
+
+```javascript
+use_mcp_tool({
+  server_name: "mysql",
+  tool_name: "describe_table",
+  arguments: {
+    table: "users"
+  }
+});
+```
+
 ## 주요 기능
 
 - MySQL 데이터베이스 연결 및 쿼리 실행
