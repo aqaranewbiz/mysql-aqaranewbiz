@@ -29,10 +29,17 @@ MYSQL_DATABASE=your_database_name
 
 ### 설치 방법
 
-1. 저장소 클론:
+#### 로컬 설치 (권장)
+
+1. Python 가상환경 생성 및 활성화:
 ```bash
-git clone [repository-url]
-cd @MCP-Server-for-Smithery
+# Windows
+python -m venv venv
+venv\Scripts\activate
+
+# macOS/Linux
+python3 -m venv venv
+source venv/bin/activate
 ```
 
 2. 의존성 설치:
@@ -40,17 +47,44 @@ cd @MCP-Server-for-Smithery
 pip install -r requirements.txt
 ```
 
-### 실행 방법
-
-1. 직접 실행:
+3. 서버 실행:
 ```bash
 python mcp_server.py
 ```
 
-2. Docker로 실행:
+#### Docker 설치
+
+1. Docker 이미지 빌드:
 ```bash
 docker build -t mysql-mcp-server .
+```
+
+2. 컨테이너 실행:
+```bash
 docker run -e MYSQL_HOST=host -e MYSQL_USER=user -e MYSQL_PASSWORD=pass -e MYSQL_DATABASE=db mysql-mcp-server
+```
+
+### 로컬 개발 설정
+
+1. 개발 환경 설정:
+```bash
+# 개발용 의존성 설치
+pip install -r requirements-dev.txt  # 필요한 경우 생성
+
+# 코드 포맷팅 및 린팅 설정
+pip install black flake8
+```
+
+2. 코드 실행:
+```bash
+# 개발 모드로 실행
+python mcp_server.py --dev
+```
+
+3. 테스트 실행:
+```bash
+# 테스트 실행
+python -m pytest tests/
 ```
 
 ## API 엔드포인트
@@ -75,14 +109,16 @@ MySQL 쿼리를 실행하고 결과를 반환합니다.
 ├── mcp_server.py      # 메인 서버 코드
 ├── requirements.txt   # Python 의존성
 ├── Dockerfile        # Docker 설정
-└── .env              # 환경 변수 (템플릿)
+├── .env              # 환경 변수 (템플릿)
+└── tests/            # 테스트 코드
 ```
 
 ### 새로운 기능 추가
 
 1. `mcp_server.py`에 새로운 도구 추가
 2. 필요한 의존성 `requirements.txt`에 추가
-3. Docker 이미지 재빌드 (Docker 사용 시)
+3. 테스트 코드 작성
+4. Docker 이미지 재빌드 (Docker 사용 시)
 
 ## 문제 해결
 
@@ -91,14 +127,21 @@ MySQL 쿼리를 실행하고 결과를 반환합니다.
 1. 연결 오류:
    - MySQL 서버가 실행 중인지 확인
    - 환경 변수가 올바르게 설정되었는지 확인
+   - 로컬 설치 시 MySQL 클라이언트 라이브러리가 설치되어 있는지 확인
 
 2. 쿼리 실행 오류:
    - SQL 구문 검사
    - 데이터베이스 권한 확인
+   - 로컬 설치 시 MySQL 커넥터 버전 확인
 
 ### 로깅
 
-서버는 기본적으로 로그를 표준 출력에 기록합니다. Docker를 사용하는 경우 로그를 확인하려면:
+서버는 기본적으로 로그를 표준 출력에 기록합니다. 로컬 설치 시 로그 레벨을 조정하려면:
+```bash
+python mcp_server.py --log-level DEBUG
+```
+
+Docker를 사용하는 경우 로그를 확인하려면:
 ```bash
 docker logs [container-id]
 ```
