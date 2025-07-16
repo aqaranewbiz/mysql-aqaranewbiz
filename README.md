@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/aqaranewbiz-mysql-aqaranewbiz-badge.png)](https://mseep.ai/app/aqaranewbiz-mysql-aqaranewbiz)
+
 # MySQL MCP 서버
 [![smithery badge](https://smithery.ai/badge/@aqaranewbiz/mysql-aqaranewbiz)](https://smithery.ai/server/@aqaranewbiz/mysql-aqaranewbiz)
 이 프로젝트는 Smithery의 Model Context Protocol (MCP)을 사용하여 MySQL 데이터베이스와 상호작용하는 서버입니다.
